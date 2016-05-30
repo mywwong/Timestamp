@@ -47,6 +47,8 @@ class Pair{
 	// List of all the sequence IDs that contains this Pair .
 	private Set<Integer> sequencesID = new HashSet<Integer>();
 	
+	private int MaxSupp = 0;
+	
 	/**
 	 * Constructor
 	 * @param timestamp  a timestamp
@@ -157,6 +159,22 @@ class Pair{
 		this.sequencesID = sequencesID;
 	}
 
+	/**
+	 * Get the Max support.
+	 * @return an int value.
+	 */
+	public int getMaxSupp() {
+		return MaxSupp;
+	}	
+
+	/**
+	 * Set the IDs of sequences containing this Pair.
+	 * @param sequencesID a Set of Integer
+	 */
+	public void setMaxSupp(int MaxSupp) {
+		this.MaxSupp = MaxSupp;
+	}
+	
 	/**
 	 * Check if this Pair is for an item found in an itemset that is a prefix.
 	 * @return true, if yes, otherwise false

@@ -142,6 +142,22 @@ public class Itemset{
 		return itemset;
 	}
 
+	
+	/**
+	 * Make an copy of this itemset with zero timestamp.
+	 * @return a new Itemset.
+	 */
+	public Itemset cloneItemSetWithZeroTime(){
+		// create a new Itemset
+		Itemset itemset = new Itemset();
+		// set timestamp to 0
+		itemset.timestamp = 0;
+		// copy all items
+		itemset.getItems().addAll(items);
+		// return the itemset
+		return itemset;
+	}
+	
 	/**
 	 * Get the timestamp
 	 * @return the timestamp

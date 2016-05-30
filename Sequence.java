@@ -101,6 +101,21 @@ public class Sequence{
 	}
 	
 	/**
+	 * Make a copy of this sequence with zero timestamp
+	 * @return a new Sequence
+	 */
+	public Sequence cloneSequenceWithZeroTime(){
+		// create new sequence with same ID
+		Sequence sequence = new Sequence(getId());
+		// for each itemset, make a copy and add it to the new sequence
+		for(Itemset itemset : itemsets){
+			sequence.addItemset(itemset.cloneItemSetWithZeroTime());
+		}
+		// return the new sequence.
+		return sequence;
+	}
+	
+	/**
 	 * Print this sequence to System.out.
 	 */
 	public void print() {

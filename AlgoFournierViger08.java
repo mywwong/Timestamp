@@ -362,7 +362,8 @@ public class AlgoFournierViger08 extends AbstractAlgoPrefixSpan{
 			
 			// (2)check if an element from the maximum periods has the same support as the prefix.
 			for(Pair pair : findAllFrequentPairsSatisfyingC1andC2ForBackwardExtensionCheck(prefix, maximumPeriods, i)){
-				if(pair.getCount() == prefix.getAbsoluteSupport()){
+				//if(pair.getCount() == prefix.getAbsoluteSupport()){
+				if(pair.getMaxSupp() == prefix.getAbsoluteSupport()){
 					return true;
 				}
 			}
@@ -413,7 +414,8 @@ public class AlgoFournierViger08 extends AbstractAlgoPrefixSpan{
 			Set<Pair> paires = findAllFrequentPairsSatisfyingC1andC2ForBackwardExtensionCheck(prefix, semimaximumPeriods, i);
 			for(Pair pair : paires){
 				// if there is extension with the same support
-				if(pair.getCount() == prefix.getAbsoluteSupport()){
+				//if(pair.getCount() == prefix.getAbsoluteSupport()){
+				if(pair.getMaxSupp() == prefix.getAbsoluteSupport()){
 					// the prefix will not be closed and we return true
 					return true;
 				}
@@ -442,7 +444,15 @@ public class AlgoFournierViger08 extends AbstractAlgoPrefixSpan{
 		Map<Pair, Pair> mapPaires = new HashMap<Pair, Pair>();
 		// the set of pair that we have already seen for the current sequence
 		// (to count each item only one time for each sequence ID)
+		
+		// Create a Map of pairs to store the pairs with zero time
+		Map<Pair, Pair> mapPairesWithZeroTime = new HashMap<Pair, Pair>();	
+		
 		Set<Pair> alreadyCountedForSequenceID = new HashSet<Pair>(); 
+		
+		// This is the remember the pairs with zero time that have been already counted
+		Set<Pair> alreadyCountedForSequenceIDZ = new HashSet<Pair>(); 
+		
 		// the last period that was scanned
 		PseudoSequence lastPeriod = null;
 		
@@ -451,7 +461,8 @@ public class AlgoFournierViger08 extends AbstractAlgoPrefixSpan{
 			// if the sequence does not have the same ID, we empty the set
 			// of items already seen
 			if(period != lastPeriod){
-				alreadyCountedForSequenceID.clear(); 
+				alreadyCountedForSequenceID.clear();
+				alreadyCountedForSequenceIDZ.clear(); 
 				lastPeriod = period;
 			}
 
@@ -505,6 +516,8 @@ public class AlgoFournierViger08 extends AbstractAlgoPrefixSpan{
 						// the item would be part of an itemset that is cut at right or at left,
 						// and the time interval with the previous item in the prefix
 						Pair pair = new Pair(successorInterval, period.isCutAtRight(i), period.isCutAtLeft(i), item);  // INTERVALLE ?
+						Pair pairewithzerotime = new Pair(0, period.isCutAtRight(i), period.isCutAtLeft(i), item);  // INTERVALLE ?
+						
 						// check if there is already a pair for that item
 						Pair oldpair = mapPaires.get(pair);
 						// if the pair was not already counted for that sequence
@@ -522,10 +535,41 @@ public class AlgoFournierViger08 extends AbstractAlgoPrefixSpan{
 							// add the sequence ID to the pair
 							pair.getSequencesID().add(period.getId());
 						}
+						
+						// check if there is already a pair for that item
+						Pair oldpairZero = mapPairesWithZeroTime.get(pairewithzerotime);
+						// if the pair was not already counted for that sequence
+						if(!alreadyCountedForSequenceIDZ.contains(pairewithzerotime)){
+							// if there was no pair already
+							if(oldpairZero == null){
+								// put the pair
+								mapPairesWithZeroTime.put(pairewithzerotime, pairewithzerotime);
+							}else{
+								//otherwise use the old one
+								pairewithzerotime = oldpairZero;
+							}
+							// remember that we have seen this pair for that sequence
+							alreadyCountedForSequenceIDZ.add(pairewithzerotime);
+							// add the sequence ID to the pair
+							pairewithzerotime.getSequencesID().add(period.getId());
+						}
 					}
 				}
 			}
 		}
+		
+		for(Pair key1 : mapPaires.keySet()){
+			for(Pair key2 : mapPairesWithZeroTime.keySet()){
+				if (mapPaires.get(key1).getItem().equals(mapPairesWithZeroTime.get(key2).getItem()))
+						mapPaires.get(key1).setMaxSupp(mapPairesWithZeroTime.get(key2).getCount());
+			}
+			System.out.println(mapPaires.get(key1).getItem() + " : " + mapPaires.get(key1).getMaxSupp() + " Time: " + mapPaires.get(key1).getTimestamp() + " IDs: " + mapPaires.get(key1).getSequencesID());
+		}
+		
+		for(Pair key2 : mapPairesWithZeroTime.keySet()){
+			System.out.println(mapPairesWithZeroTime.get(key2).getItem() + "(zero) : " + mapPairesWithZeroTime.get(key2).getCount() + " Time: " + mapPairesWithZeroTime.get(key2).getTimestamp() + " IDs: " + mapPairesWithZeroTime.get(key2).getSequencesID());
+		}
+		
 		// return the pairs
 		return mapPaires.keySet();
 	}
@@ -591,7 +635,7 @@ public class AlgoFournierViger08 extends AbstractAlgoPrefixSpan{
 		// where it appears in the projected database) that satisfy the C1, C2 and C3 constraints
 		for(Pair pair : findAllFrequentPairsSatisfyingC1andC2(prefix, database.getPseudoSequences())){
 			// If the pair is frequent
-			if(pair.getCount() >= minsuppRelative){
+			if(pair.getMaxSupp() >= minsuppRelative){
 				Sequence newPrefix;
 				// if the item is part of a postfix (an itemset cut at right)
 				if(pair.isPostfix()){
@@ -676,11 +720,19 @@ public class AlgoFournierViger08 extends AbstractAlgoPrefixSpan{
 		// for each projected database
 		for(PseudoSequenceDatabase projectedContext : projectedContexts){
 			Sequence prefix;
+			
+			//This is a sequence to be saved in the final step
+			Sequence prefixwithzerotime = null;
+			
 			// if there is no valued item (no clustering was done)
 			if(projectedContext.getCluster() == null){ 
 				// just clone the new prefix and set its sequence IDs
 				prefix = newPrefix.cloneSequence();
-				prefix.setSequencesID(paire.getSequencesID()); 
+				prefix.setSequencesID(paire.getSequencesID());
+				
+				//clone the new prefix with zero timestamp
+				prefixwithzerotime = newPrefix.cloneSequenceWithZeroTime();
+				prefixwithzerotime.setSequencesID(paire.getSequencesID());
 			}
 			else{ 
 				// Otherwise there is one or more clusters
@@ -728,7 +780,8 @@ public class AlgoFournierViger08 extends AbstractAlgoPrefixSpan{
 				// if the pattern is closed
 				if(noForwardSIExtension && noBackwardExtension){ 
 					// add the sequential patterns to the set of patterns found 
-					savePattern(prefix);
+					savePattern(prefix);				
+					//savePattern(prefixwithzerotime);					
 				}
 				//  if this is the pattern with the highest support found,
 				// then record the support.
@@ -752,18 +805,26 @@ public class AlgoFournierViger08 extends AbstractAlgoPrefixSpan{
 		
 		// Create a Map of pairs to store the pairs
 		Map<Pair, Pair> mapPaires = new HashMap<Pair, Pair>();
-		// Important: We need to make sure that don't count two time the same element 
+		// Important: We need to make sure that don't count two time the same element
+		
+		// Create a Map of pairs to store the pairs with zero time
+		Map<Pair, Pair> mapPairesWithZeroTime = new HashMap<Pair, Pair>();		
+		
 		// This is the remember the last sequence scanned
 		PseudoSequence lastSequence = null;
 		// This is the remember the pairs that have been already counted
 		Set<Pair> alreadyCountedForSequenceID = new HashSet<Pair>(); 
+
+		// This is the remember the pairs with zero time that have been already counted
+		Set<Pair> alreadyCountedForSequenceIDZ = new HashSet<Pair>(); 
 		
 		// for each sequence
 		for(PseudoSequence sequence : database){
 			// if this is a sequence with a different ID than the previous sequence
 			if(lastSequence == null || sequence.getId() != lastSequence.getId()){  //  NEW PHILIPPE OCT-08
 				// reset the Pairs that have been already processed
-				alreadyCountedForSequenceID.clear(); 
+				alreadyCountedForSequenceID.clear();
+				alreadyCountedForSequenceIDZ.clear();
 				// remember this sequence as the last sequence scanned for next time
 				lastSequence = sequence;
 			}
@@ -780,6 +841,7 @@ public class AlgoFournierViger08 extends AbstractAlgoPrefixSpan{
 						|| sequence.isCutAtLeft(i)){ 
 						// Create the pair corresponding to this item
 						Pair paire = new Pair(sequence.getTimeStamp(i), sequence.isCutAtRight(i),sequence.isCutAtLeft(i), item);
+					    Pair pairewithzerotime = new Pair(0, sequence.isCutAtRight(i),sequence.isCutAtLeft(i), item);
 						
 						// if this pair was not processed already for this sequence ID
 						if(!alreadyCountedForSequenceID.contains(paire)){
@@ -797,10 +859,39 @@ public class AlgoFournierViger08 extends AbstractAlgoPrefixSpan{
 							// remember the sequence ID of this sequence for this pair
 							paire.getSequencesID().add(sequence.getId());
 						}
+						
+						if(!alreadyCountedForSequenceIDZ.contains(pairewithzerotime)){
+							// Get the old pair for this item in the map
+							Pair oldPaire = mapPairesWithZeroTime.get(pairewithzerotime);
+							// if none, put the new one
+							if(oldPaire == null){
+								mapPairesWithZeroTime.put(pairewithzerotime, pairewithzerotime);
+							}else{
+								// otherwise use the old one
+								pairewithzerotime = oldPaire;
+							}
+							// remember that we process this pair now
+							alreadyCountedForSequenceIDZ.add(pairewithzerotime);
+							// remember the sequence ID of this sequence for this pair
+							pairewithzerotime.getSequencesID().add(sequence.getId());
+						}						
 					}
 				}
 			}
 		}
+		
+		for(Pair key1 : mapPaires.keySet()){
+			for(Pair key2 : mapPairesWithZeroTime.keySet()){
+				if (mapPaires.get(key1).getItem().equals(mapPairesWithZeroTime.get(key2).getItem()))
+						mapPaires.get(key1).setMaxSupp(mapPairesWithZeroTime.get(key2).getCount());
+			}
+			System.out.println(mapPaires.get(key1).getItem() + " : " + mapPaires.get(key1).getMaxSupp() + " Time: " + mapPaires.get(key1).getTimestamp() + " IDs: " + mapPaires.get(key1).getSequencesID());
+		}
+		
+		for(Pair key2 : mapPairesWithZeroTime.keySet()){
+			System.out.println(mapPairesWithZeroTime.get(key2).getItem() + "(zero) : " + mapPairesWithZeroTime.get(key2).getCount() + " Time: " + mapPairesWithZeroTime.get(key2).getTimestamp() + " IDs: " + mapPairesWithZeroTime.get(key2).getSequencesID());
+		}
+		
 		// return the pairs
 		return mapPaires.keySet();
 	}
